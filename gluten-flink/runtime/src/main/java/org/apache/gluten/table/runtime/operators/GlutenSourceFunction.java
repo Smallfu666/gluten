@@ -98,6 +98,11 @@ public class GlutenSourceFunction<OUT> extends RichParallelSourceFunction<OUT>
     this.shouldCallNoMoreSplits = value;
   }
 
+  /** Returns whether noMoreSplits() should be called after adding the initial split. */
+  public boolean isShouldCallNoMoreSplits() {
+    return shouldCallNoMoreSplits;
+  }
+
   public StatefulPlanNode getPlanNode() {
     return planNode;
   }

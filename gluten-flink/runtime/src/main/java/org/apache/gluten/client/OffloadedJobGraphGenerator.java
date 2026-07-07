@@ -187,14 +187,16 @@ public class OffloadedJobGraphGenerator {
       boolean supportsVectorOutput =
           supportsVectorOutput(sourceChainSlice, chainSliceGraph, jobVertex);
       Class<?> outClass = supportsVectorOutput ? StatefulRecord.class : RowData.class;
-      GlutenStreamSource newSourceOp =
-          new GlutenStreamSource(
-              new GlutenSourceFunction<>(
-                  planNode,
-                  sourceOperator.getOutputTypes(),
-                  sourceOperator.getId(),
-                  ((GlutenStreamSource) sourceOperator).getConnectorSplit(),
-                  outClass));
+      GlutenSourceFunction<?> newFn =
+          new GlutenSourceFunction<>(
+              planNode,
+              sourceOperator.getOutputTypes(),
+              sourceOperator.getId(),
+              ((GlutenStreamSource) sourceOperator).getConnectorSplit(),
+              outClass);
+      newFn.setShouldCallNoMoreSplits(
+          ((GlutenStreamSource) sourceOperator).isShouldCallNoMoreSplits());
+      GlutenStreamSource newSourceOp = new GlutenStreamSource(newFn);
       offloadedOpConfig.setStreamOperator(newSourceOp);
       if (supportsVectorOutput) {
         setOffloadedOutputSerializer(offloadedOpConfig, sourceOperator);
