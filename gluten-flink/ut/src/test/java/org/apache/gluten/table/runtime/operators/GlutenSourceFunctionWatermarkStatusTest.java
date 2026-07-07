@@ -47,9 +47,7 @@ public class GlutenSourceFunctionWatermarkStatusTest {
   private static final String CONNECTOR_ID = "test-connector";
 
   private static final RowType OUTPUT_TYPE =
-      new RowType(
-          Arrays.asList("id"),
-          Arrays.asList(new BigIntType()));
+      new RowType(Arrays.asList("id"), Arrays.asList(new BigIntType()));
 
   /**
    * A test spy that tracks {@link SourceContext} invocations so we can verify that idle/active
@@ -149,8 +147,7 @@ public class GlutenSourceFunctionWatermarkStatusTest {
     assertFalse(context.idleCalled);
 
     // SourceContext state is not visible from our spy — verify invocations sequence.
-    assertThat(context.invocations)
-        .containsExactly("markAsTemporarilyIdle");
+    assertThat(context.invocations).containsExactly("markAsTemporarilyIdle");
   }
 
   @Test
@@ -167,10 +164,7 @@ public class GlutenSourceFunctionWatermarkStatusTest {
     invokeProcessWatermarkStatus(sourceFunction, context, idleStatus);
 
     assertThat(context.invocations)
-        .containsExactly(
-            "markAsTemporarilyIdle",
-            "markAsTemporarilyIdle",
-            "markAsTemporarilyIdle");
+        .containsExactly("markAsTemporarilyIdle", "markAsTemporarilyIdle", "markAsTemporarilyIdle");
   }
 
   @Test
