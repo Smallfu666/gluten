@@ -1305,7 +1305,16 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi with Logging {
     // ISOControl characters, refer java.lang.Character.isISOControl(int)
     val isoControlStr = (('\u0000' to '\u001F') ++ ('\u007F' to '\u009F')).toList.mkString
     // scalastyle:on nonascii
-    if (VeloxConfig.get.castFromVarcharAddTrimNode && c.child.dataType == StringType) {
+    val isLongDecimalToDouble = c.dataType == DoubleType && (c.child.dataType match {
+      case decimalType: DecimalType => decimalType.precision > 18
+      case _ => false
+    })
+    if (isLongDecimalToDouble) {
+      // Velox converts long-decimal unscaled int128 to double before applying the scale factor,
+      // so precision can be lost. Precision above 18 uses Velox's long-decimal representation;
+      // parsing its exact string value preserves Spark's correctly rounded conversion.
+      c.copy(child = Cast(c.child, StringType, c.timeZoneId, c.evalMode))
+    } else if (VeloxConfig.get.castFromVarcharAddTrimNode && c.child.dataType == StringType) {
       val trimStr = c.dataType match {
         case BinaryType | _: ArrayType | _: MapType | _: StructType | _: UserDefinedType[_] =>
           None

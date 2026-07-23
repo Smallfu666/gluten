@@ -449,6 +449,19 @@ class MathFunctionsValidateSuite extends FunctionsValidateSuite {
     }
   }
 
+  test("decimal to double preserves precision after decimal division") {
+    withSQLConf(
+      "spark.sql.optimizer.excludedRules" ->
+        "org.apache.spark.sql.catalyst.optimizer.ConstantFolding",
+      "spark.sql.decimalOperations.allowPrecisionLoss" -> "false"
+    ) {
+      runQueryAndCompare(
+        "SELECT CAST(2.8 / CAST(0.0130597014925373134 AS DECIMAL(38,19)) AS DOUBLE)") {
+        checkGlutenPlan[ProjectExecTransformer]
+      }
+    }
+  }
+
   testWithMinSparkVersion(
     "decimal arithmetic respects allowPrecisionLoss captured at view analysis time",
     "4.1") {
