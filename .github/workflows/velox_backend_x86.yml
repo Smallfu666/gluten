@@ -59,13 +59,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Get Ccache
-        uses: actions/cache/restore@v4
+      - name: Get Ccache from Apache Stash
+        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos7-release-default-${{github.sha}}
-          restore-keys: |
-            ccache-centos7-release-default
+          key: ccache-centos7-release-default-${{ hashFiles('ep/build-velox/src/**') }}
       - name: Build Gluten native libraries
         run: |
           docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:vcpkg-centos-7-gcc13 bash -c "
@@ -982,13 +980,11 @@ jobs:
     container: apache/gluten:centos-9-jdk8
     steps:
       - uses: actions/checkout@v4
-      - name: Get Ccache
-        uses: actions/cache/restore@v4
+      - name: Get Ccache from Apache Stash
+        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos9-release-shared-${{runner.arch}}-${{github.sha}}
-          restore-keys: |
-            ccache-centos9-release-shared-${{runner.arch}}
+          key: ccache-centos9-release-shared-${{runner.arch}}-${{ hashFiles('ep/build-velox/src/**') }}
       - name: Build Gluten native libraries
         run: |
           df -a
@@ -1052,13 +1048,11 @@ jobs:
       - run: df -h | sort -k 5 -nr # check disk space for debug
 
       - uses: actions/checkout@v4
-      - name: Get Ccache
-        uses: actions/cache/restore@v4
+      - name: Get Ccache from Apache Stash
+        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos9-cudf-release-shared-${{runner.arch}}-${{github.sha}}
-          restore-keys: |
-            ccache-centos9-cudf-release-shared-${{runner.arch}}
+          key: ccache-centos9-cudf-release-shared-${{runner.arch}}-${{ hashFiles('ep/build-velox/src/**') }}
       - name: Build Gluten native libraries
         run: |
           docker run -v $GITHUB_WORKSPACE:/work -w /work apache/gluten:centos-9-jdk8-cudf bash -c "

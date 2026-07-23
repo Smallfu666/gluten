@@ -56,13 +56,11 @@ jobs:
     container: apache/gluten:vcpkg-centos-9
     steps:
       - uses: actions/checkout@v4
-      - name: Get Ccache
-        uses: actions/cache/restore@v4
+      - name: Get Ccache from Apache Stash
+        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos8-release-default-${{runner.arch}}-${{github.sha}}
-          restore-keys: |
-            ccache-centos8-release-default-${{runner.arch}}
+          key: ccache-centos8-release-default-${{runner.arch}}-${{ hashFiles('ep/build-velox/src/**') }}
       - name: Build Gluten native libraries
         run: |
           df -a
@@ -129,13 +127,11 @@ jobs:
     container: apache/gluten:centos-9-jdk8
     steps:
       - uses: actions/checkout@v4
-      - name: Get Ccache
-        uses: actions/cache/restore@v4
+      - name: Get Ccache from Apache Stash
+        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos9-release-shared-${{runner.arch}}-${{github.sha}}
-          restore-keys: |
-            ccache-centos9-release-shared-${{runner.arch}}
+          key: ccache-centos9-release-shared-${{runner.arch}}-${{ hashFiles('ep/build-velox/src/**') }}
       - name: Build Gluten native libraries
         run: |
           df -a
