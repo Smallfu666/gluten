@@ -16,12 +16,15 @@
  */
 package org.apache.gluten.functions
 
+import org.apache.gluten.backendsapi.BackendsApiManager
 import org.apache.gluten.config.GlutenConfig
 import org.apache.gluten.execution.{BatchScanExecTransformer, ProjectExecTransformer}
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Cast}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{DecimalType, DoubleType, StringType}
 
 class MathFunctionsValidateSuiteAnsiOn extends FunctionsValidateSuite {
 
@@ -458,6 +461,78 @@ class MathFunctionsValidateSuite extends FunctionsValidateSuite {
       runQueryAndCompare(
         "SELECT CAST(2.8 / CAST(0.0130597014925373134 AS DECIMAL(38,19)) AS DOUBLE)") {
         checkGlutenPlan[ProjectExecTransformer]
+      }
+    }
+  }
+
+  test("GLUTEN-12356: long decimal to double rewrite applies only to precision > 18") {
+    val api = BackendsApiManager.getSparkPlanExecApiInstance
+    def castOf(precision: Int, scale: Int): Cast =
+      Cast(AttributeReference("c", DecimalType(precision, scale))(), DoubleType)
+    // Precision <= 18 keeps Velox's direct conversion.
+    assert(api.genCastWithNewChild(castOf(18, 6)).child.dataType == DecimalType(18, 6))
+    // Precision > 18 goes through the exact string representation.
+    assert(api.genCastWithNewChild(castOf(19, 0)).child.dataType == StringType)
+    assert(api.genCastWithNewChild(castOf(38, 19)).child.dataType == StringType)
+  }
+
+  test("GLUTEN-12356: direct cast of decimal to double matches vanilla Spark") {
+    withTempView("decimal_double_cast") {
+      withTempPath {
+        path =>
+          // Cover short decimal (no rewrite), long decimal at both precision bounds,
+          // zero/negative/NULL values, values around 2^53, and near-max 38-digit values.
+          spark
+            .sql("""
+                   |SELECT
+                   |  CAST(v18 AS DECIMAL(18,6)) AS d18_6,
+                   |  CAST(v19 AS DECIMAL(19,0)) AS d19_0,
+                   |  CAST(v38_0 AS DECIMAL(38,0)) AS d38_0,
+                   |  CAST(v38_19 AS DECIMAL(38,19)) AS d38_19,
+                   |  CAST(v38_38 AS DECIMAL(38,38)) AS d38_38
+                   |FROM VALUES
+                   |  ('123456789012.345678', '9007199254740991',
+                   |   '12345678901234567890123456789012345678',
+                   |   '214.4000000000000006143270301075587414',
+                   |   '0.99999999999999999999999999999999999999'),
+                   |  ('999999999999.999999', '9007199254740992',
+                   |   '9007199254740993',
+                   |   '9007199254740993.0000000000000000001',
+                   |   '0.00000000000000000000000000000000000001'),
+                   |  ('-123456789012.345678', '-9007199254740993',
+                   |   '-99999999999999999999999999999999999999',
+                   |   '-0.0130597014925373134',
+                   |   '-0.5'),
+                   |  ('0', '0', '0', '0', '0'),
+                   |  (NULL, NULL, NULL, NULL, NULL),
+                   |  ('999999999999.999999', '9999999999999999999',
+                   |   '99999999999999999999999999999999999999',
+                   |   '9999999999999999999.9999999999999999999',
+                   |   '0.12345678901234567890123456789012345678')
+                   |AS t(v18, v19, v38_0, v38_19, v38_38)
+                   |""".stripMargin)
+            .write
+            .parquet(path.getCanonicalPath)
+          spark.read.parquet(path.getCanonicalPath).createOrReplaceTempView("decimal_double_cast")
+
+          Seq("true", "false").foreach {
+            ansi =>
+              withSQLConf(
+                SQLConf.ANSI_ENABLED.key -> ansi,
+                GlutenConfig.GLUTEN_ANSI_FALLBACK_ENABLED.key -> "false") {
+                runQueryAndCompare("""
+                                     |SELECT
+                                     |  CAST(d18_6 AS DOUBLE),
+                                     |  CAST(d19_0 AS DOUBLE),
+                                     |  CAST(d38_0 AS DOUBLE),
+                                     |  CAST(d38_19 AS DOUBLE),
+                                     |  CAST(d38_38 AS DOUBLE)
+                                     |FROM decimal_double_cast
+                                     |""".stripMargin) {
+                  checkGlutenPlan[ProjectExecTransformer]
+                }
+              }
+          }
       }
     }
   }
