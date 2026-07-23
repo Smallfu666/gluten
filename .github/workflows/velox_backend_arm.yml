@@ -57,10 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Get Ccache
-        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
+        uses: actions/cache/restore@v4
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos8-release-default-${{runner.arch}}
+          key: ccache-centos8-release-default-${{runner.arch}}-${{github.sha}}
+          restore-keys: |
+            ccache-centos8-release-default-${{runner.arch}}
       - name: Build Gluten native libraries
         run: |
           df -a
@@ -68,12 +70,11 @@ jobs:
           bash dev/ci-velox-buildstatic-centos-9.sh
           ccache -s
       - name: "Save ccache"
-        uses: apache/infrastructure-actions/stash/save@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
+        uses: actions/cache/save@v4
         id: ccache
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos8-release-default-${{runner.arch}}
-          include-hidden-files: true
+          key: ccache-centos8-release-default-${{runner.arch}}-${{github.sha}}
       - uses: actions/upload-artifact@v4
         with:
           name: velox-native-lib-centos-8-${{github.sha}}
@@ -129,10 +130,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Get Ccache
-        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
+        uses: actions/cache/restore@v4
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-centos9-release-shared-${{runner.arch}}
+          key: ccache-centos9-release-shared-${{runner.arch}}-${{github.sha}}
+          restore-keys: |
+            ccache-centos9-release-shared-${{runner.arch}}
       - name: Build Gluten native libraries
         run: |
           df -a

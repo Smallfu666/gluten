@@ -57,10 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Get Ccache
-        uses: apache/infrastructure-actions/stash/restore@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
+        uses: actions/cache/restore@v4
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-enhanced-centos7-release-default
+          key: ccache-enhanced-centos7-release-default-${{github.sha}}
+          restore-keys: |
+            ccache-enhanced-centos7-release-default
       - name: Build Gluten native libraries
         run: |
           docker pull apache/gluten:vcpkg-centos-7-gcc13
@@ -77,12 +79,11 @@ jobs:
           "
 
       - name: "Save ccache"
-        uses: apache/infrastructure-actions/stash/save@0ba14156c9f4c3cfbe4b0c9f36339ab0f8d81e53
+        uses: actions/cache/save@v4
         id: ccache
         with:
           path: '${{ env.CCACHE_DIR }}'
-          key: ccache-enhanced-centos7-release-default
-          include-hidden-files: true
+          key: ccache-enhanced-centos7-release-default-${{github.sha}}
       - uses: actions/upload-artifact@v4
         with:
           name: velox-native-lib-enhanced-centos-7-${{github.sha}}
