@@ -1313,7 +1313,10 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi with Logging {
       // Velox converts long-decimal unscaled int128 to double before applying the scale factor,
       // so precision can be lost. Precision above 18 uses Velox's long-decimal representation;
       // parsing its exact string value preserves Spark's correctly rounded conversion.
-      c.copy(child = Cast(c.child, StringType, c.timeZoneId, c.evalMode))
+      // Use the 3-arg Cast (no evalMode) for cross-version compatibility: Cast.evalMode does
+      // not exist before Spark 3.4, and decimal-to-string is lossless regardless of eval mode,
+      // so the outer cast (kept via withNewChildren) still carries the original ANSI semantics.
+      c.withNewChildren(Seq(Cast(c.child, StringType, c.timeZoneId))).asInstanceOf[Cast]
     } else if (VeloxConfig.get.castFromVarcharAddTrimNode && c.child.dataType == StringType) {
       val trimStr = c.dataType match {
         case BinaryType | _: ArrayType | _: MapType | _: StructType | _: UserDefinedType[_] =>
