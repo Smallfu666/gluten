@@ -46,9 +46,6 @@ concurrency:
 
 jobs:
   check-comment:
-    permissions:
-      contents: read
-      pull-requests: write
     # /ansi-test => full mode (build+test+analyze)
     # /ansi-analyze => analyze-only mode (reuse artifacts from latest run)
     if: >-
