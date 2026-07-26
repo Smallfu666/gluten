@@ -27,6 +27,20 @@ class ArithmeticAnsiValidateSuite extends FunctionsValidateSuite {
 
   disableFallbackCheck
 
+  private def assertArithmeticException(body: => Unit): Unit = {
+    val thrown = intercept[Exception](body)
+    val causeChain =
+      Iterator
+        .iterate(thrown: Throwable)(_.getCause)
+        .take(16)
+        .takeWhile(_ != null)
+        .toSeq
+    assert(
+      causeChain.exists(_.isInstanceOf[ArithmeticException]),
+      s"Expected ArithmeticException in cause chain, got: " +
+        causeChain.map(_.getClass.getName).mkString(" -> "))
+  }
+
   override protected def sparkConf: SparkConf = {
     super.sparkConf
       .set(GlutenConfig.GLUTEN_ANSI_FALLBACK_ENABLED.key, "false")
@@ -41,7 +55,8 @@ class ArithmeticAnsiValidateSuite extends FunctionsValidateSuite {
     val df = sql("SELECT 2147483647 + 1")
 
     if (isSparkVersionGE("4.0")) {
-      intercept[SparkException] {
+      checkGlutenPlan[ProjectExecTransformer](df)
+      assertArithmeticException {
         df.collect()
       }
     } else {
