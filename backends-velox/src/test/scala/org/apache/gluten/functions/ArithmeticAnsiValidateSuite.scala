@@ -38,7 +38,8 @@ class ArithmeticAnsiValidateSuite extends FunctionsValidateSuite {
     assert(
       causeChain.exists(_.isInstanceOf[ArithmeticException]),
       s"Expected ArithmeticException in cause chain, got: " +
-        causeChain.map(_.getClass.getName).mkString(" -> "))
+        causeChain.map(_.getClass.getName).mkString(" -> ")
+    )
   }
 
   override protected def sparkConf: SparkConf = {

@@ -92,3 +92,4 @@ metastore_db/
 
 # Claude Code local config
 .claude/
+.ccache/
