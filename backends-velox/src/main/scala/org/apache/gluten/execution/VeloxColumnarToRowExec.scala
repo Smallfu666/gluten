@@ -176,14 +176,15 @@ object VeloxColumnarToRowExec {
         return Iterator.empty
       }
 
+      // Track batch immediately for exception safety
+      currentBatch = batch
+
       if (batch.numCols() == 0) {
         val rows = ColumnarBatches.emptyRowIterator(batch.numRows()).asScala
-        currentBatch = batch
         return rows
       }
 
       VeloxColumnarBatches.checkVeloxBatch(batch)
-      currentBatch = batch
 
       new Iterator[InternalRow] {
         private val cols = batch.numCols()
