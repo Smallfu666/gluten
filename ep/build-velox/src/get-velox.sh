@@ -68,15 +68,13 @@ function process_setup_ubuntu {
   sed -i "s|run_and_time install_arrow||g" scripts/setup-ubuntu.sh
   sed -i "s|libgflags-dev||g" scripts/setup-ubuntu.sh
   if ! grep -q "install_gflags" scripts/setup-ubuntu.sh; then
-    cat << 'EOF' >> scripts/setup-ubuntu.sh
-
-function install_gflags {
-  github_checkout gflags/gflags v2.2.2
-  cmake_install -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-}
-
-run_and_time install_gflags
-EOF
+    sed -i '/function install_folly/i \
+function install_gflags {\
+  github_checkout gflags/gflags v2.2.2\
+  cmake_install_dir gflags -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON\
+}\
+' scripts/setup-ubuntu.sh
+    sed -i '/run_and_time install_folly/i \  run_and_time install_gflags' scripts/setup-ubuntu.sh
   fi
   echo "Using setup script from Velox"
 }
