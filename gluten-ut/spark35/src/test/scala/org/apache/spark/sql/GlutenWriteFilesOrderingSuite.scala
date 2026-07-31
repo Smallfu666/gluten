@@ -22,8 +22,8 @@ class GlutenWriteFilesOrderingSuite extends GlutenSQLTestsBaseTrait {
     withSQLConf("spark.sql.optimizer.plannedWrite.enabled" -> "true") {
       withTable("t1_9789", "t2_9789") {
         withTempPath { path =>
-          val df1 = spark.range(0, 1000).selectExpr("id", "id % 10 as p", "cast(id as string) as v1")
-          val df2 = spark.range(0, 1000).selectExpr("id", "id % 10 as p", "cast(id as string) as v2")
+          val df1 = spark.range(0, 1000).selectExpr("id as id1", "id % 10 as p", "cast(id as string) as v1")
+          val df2 = spark.range(0, 1000).selectExpr("id as id2", "id % 10 as p", "cast(id as string) as v2")
           df1.write.saveAsTable("t1_9789")
           df2.write.saveAsTable("t2_9789")
 
