@@ -70,7 +70,7 @@ function process_setup_ubuntu {
   if ! grep -q "^function install_gflags {" scripts/setup-ubuntu.sh; then
     sed -i '/function install_velox_deps {/i \
 function install_gflags {\
-  github_checkout gflags/gflags v2.2.2\
+  wget_and_untar https://github.com/gflags/gflags/archive/${GFLAGS_VERSION}.tar.gz gflags\
   cmake_install_dir gflags -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON\
 }\
 ' scripts/setup-ubuntu.sh
