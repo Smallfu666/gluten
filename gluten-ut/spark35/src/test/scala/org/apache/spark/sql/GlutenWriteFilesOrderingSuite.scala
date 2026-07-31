@@ -16,8 +16,6 @@
  */
 package org.apache.spark.sql
 
-import org.apache.spark.sql.execution.datasources.WriteFilesExec
-
 class GlutenWriteFilesOrderingSuite extends GlutenSQLTestsBaseTrait {
 
   test("GLUTEN-9789: WriteFiles ordering broken by SMJ-to-SHJ conversion") {
