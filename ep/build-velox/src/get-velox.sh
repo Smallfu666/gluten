@@ -78,6 +78,20 @@ function install_gflags {\
   if ! grep -q "^[[:space:]]*run_and_time install_gflags$" scripts/setup-ubuntu.sh; then
     sed -i '/run_and_time install_velox_deps_from_apt/a \  run_and_time install_gflags' scripts/setup-ubuntu.sh
   fi
+
+  # Fail closed validation checks
+  local func_count=$(grep -c "^function install_gflags {" scripts/setup-ubuntu.sh || true)
+  local call_count=$(grep -c "^[[:space:]]*run_and_time install_gflags$" scripts/setup-ubuntu.sh || true)
+  if [ "$func_count" -ne 1 ] || [ "$call_count" -ne 1 ]; then
+    echo "ERROR: install_gflags transformation validation failed: func_count=$func_count, call_count=$call_count"
+    exit 1
+  fi
+
+  bash -n scripts/setup-ubuntu.sh || {
+    echo "ERROR: scripts/setup-ubuntu.sh syntax check failed"
+    exit 1
+  }
+
   echo "Using setup script from Velox"
 }
 
