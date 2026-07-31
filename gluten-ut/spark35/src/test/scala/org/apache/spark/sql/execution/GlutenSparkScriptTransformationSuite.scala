@@ -29,4 +29,14 @@ class GlutenSparkScriptTransformationSuite
       spark.sql("SELECT TRANSFORM(a) USING 'cat' AS (a) FROM t_12649 LIMIT 10").collect()
     }
   }
+
+  test("GLUTEN-12649: Missing command teardown path") {
+    for (_ <- 1 to 20) {
+      val df = spark.range(1000).selectExpr("CAST(id AS STRING) as a")
+      df.createOrReplaceTempView("t_12649_err")
+      intercept[Exception] {
+        spark.sql("SELECT TRANSFORM(a) USING 'some_non_existent_command' AS (a) FROM t_12649_err").collect()
+      }
+    }
+  }
 }
