@@ -163,25 +163,38 @@ object VeloxColumnarToRowExec {
     // TODO: Pass the jni jniWrapper and arrowSchema and serializeSchema method by broadcast.
     private val jniWrapper = NativeColumnarToRowJniWrapper.create(runtime)
     private val c2rId = jniWrapper.nativeColumnarToRowInit()
-    private var currentBatch: ColumnarBatch = _
+    private val activeBatches = java.util.Collections.newSetFromMap(
+      new java.util.concurrent.ConcurrentHashMap[ColumnarBatch, java.lang.Boolean]()
+    )
 
     def toRowIterator(batch: ColumnarBatch): Iterator[InternalRow] = {
-      if (currentBatch != null) {
-        currentBatch.close()
-        currentBatch = null
-      }
-
       if (batch.numRows() == 0) {
         batch.close()
         return Iterator.empty
       }
 
-      // Track batch immediately for exception safety
-      currentBatch = batch
+      activeBatches.add(batch)
 
       if (batch.numCols() == 0) {
         val rows = ColumnarBatches.emptyRowIterator(batch.numRows()).asScala
-        return rows
+        return new Iterator[InternalRow] {
+          private var closed = false
+          private def closeBatch(): Unit = {
+            if (!closed) {
+              closed = true
+              activeBatches.remove(batch)
+              batch.close()
+            }
+          }
+          override def hasNext: Boolean = {
+            val res = rows.hasNext
+            if (!res) {
+              closeBatch()
+            }
+            res
+          }
+          override def next(): InternalRow = rows.next()
+        }
       }
 
       VeloxColumnarBatches.checkVeloxBatch(batch)
@@ -197,15 +210,21 @@ object VeloxColumnarToRowExec {
         private var baseLength = 0
         private val row = new UnsafeRow(cols)
         private var info: NativeColumnarToRowInfo = _
+        private var closed = false
+
+        private def closeBatch(): Unit = {
+          if (!closed) {
+            closed = true
+            activeBatches.remove(batch)
+            batch.close()
+          }
+        }
 
         override def hasNext: Boolean = {
           if (rowId < rows) {
             true
           } else {
-            if (currentBatch != null) {
-              currentBatch.close()
-              currentBatch = null
-            }
+            closeBatch()
             false
           }
         }
@@ -231,11 +250,16 @@ object VeloxColumnarToRowExec {
     }
 
     def close(): Unit = {
-      if (currentBatch != null) {
-        currentBatch.close()
-        currentBatch = null
+      try {
+        val it = activeBatches.iterator()
+        while (it.hasNext) {
+          val b = it.next()
+          it.remove()
+          b.close()
+        }
+      } finally {
+        jniWrapper.nativeClose(c2rId)
       }
-      jniWrapper.nativeClose(c2rId)
     }
   }
 }
