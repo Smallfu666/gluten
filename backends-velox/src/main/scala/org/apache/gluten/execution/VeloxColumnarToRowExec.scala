@@ -163,18 +163,27 @@ object VeloxColumnarToRowExec {
     // TODO: Pass the jni jniWrapper and arrowSchema and serializeSchema method by broadcast.
     private val jniWrapper = NativeColumnarToRowJniWrapper.create(runtime)
     private val c2rId = jniWrapper.nativeColumnarToRowInit()
+    private var currentBatch: ColumnarBatch = _
 
     def toRowIterator(batch: ColumnarBatch): Iterator[InternalRow] = {
+      if (currentBatch != null) {
+        currentBatch.close()
+        currentBatch = null
+      }
+
       if (batch.numRows() == 0) {
+        batch.close()
         return Iterator.empty
       }
 
       if (batch.numCols() == 0) {
         val rows = ColumnarBatches.emptyRowIterator(batch.numRows()).asScala
+        currentBatch = batch
         return rows
       }
 
       VeloxColumnarBatches.checkVeloxBatch(batch)
+      currentBatch = batch
 
       new Iterator[InternalRow] {
         private val cols = batch.numCols()
@@ -189,7 +198,15 @@ object VeloxColumnarToRowExec {
         private var info: NativeColumnarToRowInfo = _
 
         override def hasNext: Boolean = {
-          rowId < rows
+          if (rowId < rows) {
+            true
+          } else {
+            if (currentBatch != null) {
+              currentBatch.close()
+              currentBatch = null
+            }
+            false
+          }
         }
 
         override def next(): InternalRow = {
@@ -213,6 +230,10 @@ object VeloxColumnarToRowExec {
     }
 
     def close(): Unit = {
+      if (currentBatch != null) {
+        currentBatch.close()
+        currentBatch = null
+      }
       jniWrapper.nativeClose(c2rId)
     }
   }

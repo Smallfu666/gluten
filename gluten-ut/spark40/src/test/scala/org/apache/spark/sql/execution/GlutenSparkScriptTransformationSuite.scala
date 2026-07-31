@@ -20,4 +20,13 @@ import org.apache.spark.sql.GlutenSQLTestsBaseTrait
 
 class GlutenSparkScriptTransformationSuite
   extends SparkScriptTransformationSuite
-  with GlutenSQLTestsBaseTrait {}
+  with GlutenSQLTestsBaseTrait {
+
+  test("GLUTEN-12649: Velox MemoryManager teardown flake with script transformation") {
+    for (_ <- 1 to 20) {
+      val df = spark.range(1000).selectExpr("CAST(id AS STRING) as a")
+      df.createOrReplaceTempView("t_12649")
+      spark.sql("SELECT TRANSFORM(a) USING 'cat' AS (a) FROM t_12649 LIMIT 10").collect()
+    }
+  }
+}
