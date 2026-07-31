@@ -69,27 +69,7 @@ abstract class SortMergeJoinExecTransformerBase(
   override def requiredChildOrdering: Seq[Seq[SortOrder]] =
     requiredOrders(leftKeys) :: requiredOrders(rightKeys) :: Nil
 
-  override def outputOrdering: Seq[SortOrder] = joinType match {
-    // For inner like join, orders of both sides keys should be kept.
-    case _: InnerLike =>
-      val leftKeyOrdering = getKeyOrdering(leftKeys, left.outputOrdering)
-      val rightKeyOrdering = getKeyOrdering(rightKeys, right.outputOrdering)
-      leftKeyOrdering.zip(rightKeyOrdering).map {
-        case (lKey, rKey) =>
-          // Also add the right key and its `sameOrderExpressions`
-          val sameOrderExpressions = ExpressionSet(lKey.sameOrderExpressions ++ rKey.children)
-          SortOrder(lKey.child, Ascending, sameOrderExpressions.toSeq)
-      }
-    // For left and right outer joins, the output is ordered by the streamed input's join keys.
-    case LeftOuter => getKeyOrdering(leftKeys, left.outputOrdering)
-    case RightOuter => getKeyOrdering(rightKeys, right.outputOrdering)
-    // There are null rows in both streams, so there is no order.
-    case FullOuter => Nil
-    case LeftExistence(_) => getKeyOrdering(leftKeys, left.outputOrdering)
-    case x =>
-      throw new IllegalArgumentException(
-        s"${getClass.getSimpleName} should not take $x as the JoinType")
-  }
+  override def outputOrdering: Seq[SortOrder] = Nil
 
   private def getKeyOrdering(
       keys: Seq[Expression],
