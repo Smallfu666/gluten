@@ -39,4 +39,19 @@ class GlutenSparkScriptTransformationSuite
       }
     }
   }
+
+  test("GLUTEN-12649: Converter state machine idempotency and post-close rejection") {
+    val metric = new org.apache.spark.sql.execution.metric.SQLMetric("test")
+    val converter = new VeloxColumnarToRowExec.Converter(metric)
+    
+    // Test double close idempotency
+    converter.close()
+    converter.close()
+
+    // Test post-close rejection
+    val dummyBatch = new org.apache.spark.sql.vectorized.ColumnarBatch(Array.empty, 0)
+    intercept[IllegalArgumentException] {
+      converter.toRowIterator(dummyBatch)
+    }
+  }
 }
