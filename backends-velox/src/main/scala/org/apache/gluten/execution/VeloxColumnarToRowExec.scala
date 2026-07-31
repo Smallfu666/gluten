@@ -153,15 +153,6 @@ object VeloxColumnarToRowExec {
       .create()
   }
 
-  final class BatchLease(val batch: ColumnarBatch) {
-    private val closed = new java.util.concurrent.atomic.AtomicBoolean(false)
-    def closeOnce(): Unit = {
-      if (closed.compareAndSet(false, true)) {
-        batch.close()
-      }
-    }
-  }
-
   /**
    * A convenient C2R API to allow caller converts batches on demand without having to pass in an
    * Iterator[ColumnarBatch].
@@ -172,36 +163,15 @@ object VeloxColumnarToRowExec {
     // TODO: Pass the jni jniWrapper and arrowSchema and serializeSchema method by broadcast.
     private val jniWrapper = NativeColumnarToRowJniWrapper.create(runtime)
     private val c2rId = jniWrapper.nativeColumnarToRowInit()
-    private val converterClosed = new java.util.concurrent.atomic.AtomicBoolean(false)
-    private val activeLeases = java.util.Collections.newSetFromMap(
-      new java.util.concurrent.ConcurrentHashMap[BatchLease, java.lang.Boolean]()
-    )
 
     def toRowIterator(batch: ColumnarBatch): Iterator[InternalRow] = {
-      require(!converterClosed.get(), "Converter is already closed")
-
-      val lease = new BatchLease(batch)
-      activeLeases.add(lease)
-
       if (batch.numRows() == 0) {
-        activeLeases.remove(lease)
-        lease.closeOnce()
         return Iterator.empty
       }
 
       if (batch.numCols() == 0) {
         val rows = ColumnarBatches.emptyRowIterator(batch.numRows()).asScala
-        return new Iterator[InternalRow] {
-          override def hasNext: Boolean = {
-            val res = rows.hasNext
-            if (!res) {
-              activeLeases.remove(lease)
-              lease.closeOnce()
-            }
-            res
-          }
-          override def next(): InternalRow = rows.next()
-        }
+        return rows
       }
 
       VeloxColumnarBatches.checkVeloxBatch(batch)
@@ -218,18 +188,8 @@ object VeloxColumnarToRowExec {
         private val row = new UnsafeRow(cols)
         private var info: NativeColumnarToRowInfo = _
 
-        private def finishIterator(): Unit = {
-          activeLeases.remove(lease)
-          lease.closeOnce()
-        }
-
         override def hasNext: Boolean = {
-          if (rowId < rows) {
-            true
-          } else {
-            finishIterator()
-            false
-          }
+          rowId < rows
         }
 
         override def next(): InternalRow = {
@@ -253,41 +213,7 @@ object VeloxColumnarToRowExec {
     }
 
     def close(): Unit = {
-      if (!converterClosed.compareAndSet(false, true)) {
-        return
-      }
-
-      var firstException: Throwable = null
-      val it = activeLeases.iterator()
-      while (it.hasNext) {
-        val lease = it.next()
-        it.remove()
-        try {
-          lease.closeOnce()
-        } catch {
-          case t: Throwable =>
-            if (firstException == null) {
-              firstException = t
-            } else {
-              firstException.addSuppressed(t)
-            }
-        }
-      }
-
-      try {
-        jniWrapper.nativeClose(c2rId)
-      } catch {
-        case t: Throwable =>
-          if (firstException == null) {
-            firstException = t
-          } else {
-            firstException.addSuppressed(t)
-          }
-      }
-
-      if (firstException != null) {
-        throw firstException
-      }
+      jniWrapper.nativeClose(c2rId)
     }
   }
 }
