@@ -66,6 +66,37 @@ fi
 
 function process_setup_ubuntu {
   sed -i "s|run_and_time install_arrow||g" scripts/setup-ubuntu.sh
+  # GLUTEN 12316: Ubuntu's apt libgflags.a is not -fPIC, so it cannot be linked into the
+  # shared libvelox.so (relocation R_X86_64_PC32 against `stderr`). apt glog additionally
+  # drags apt libgflags.so.2.2 into the process at runtime (glog -> gflags), coexisting with
+  # a source gflags. Build the pinned gflags from source with PIC, and also run the canonical
+  # install_glog already provided by setup-common.sh so glog is source-built against the same
+  # gflags. Both install into /usr/local (searched before the apt copies) and run before
+  # install_folly. cmake_install_dir forces -fPIC.
+  if ! grep -q "^function install_gflags {" scripts/setup-ubuntu.sh; then
+    sed -i '/function install_velox_deps {/i \
+function install_gflags {\
+  wget_and_untar https://github.com/gflags/gflags/archive/${GFLAGS_VERSION}.tar.gz gflags\
+  cmake_install_dir gflags -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=ON -DBUILD_gflags_LIB=ON\
+}\
+' scripts/setup-ubuntu.sh
+  fi
+  if ! grep -q "^[[:space:]]*run_and_time install_gflags$" scripts/setup-ubuntu.sh; then
+    sed -i '/run_and_time install_velox_deps_from_apt/a \
+  run_and_time install_gflags\
+  run_and_time install_glog' scripts/setup-ubuntu.sh
+  fi
+  local gflags_func gflags_call glog_call
+  gflags_func=$(grep -c "^function install_gflags {" scripts/setup-ubuntu.sh || true)
+  gflags_call=$(grep -c "^[[:space:]]*run_and_time install_gflags$" scripts/setup-ubuntu.sh || true)
+  glog_call=$(grep -c "^[[:space:]]*run_and_time install_glog$" scripts/setup-ubuntu.sh || true)
+  # install_glog is provided canonically by setup-common.sh (sourced by setup-ubuntu.sh);
+  # only inject its call, and assert the canonical definition is present to resolve it.
+  if [ "$gflags_func" -ne 1 ] || [ "$gflags_call" -ne 1 ] || [ "$glog_call" -ne 1 ] \
+     || ! grep -q "^function install_glog {" scripts/setup-common.sh; then
+    echo "ERROR: gflags/glog injection failed: gflags_func=$gflags_func gflags_call=$gflags_call glog_call=$glog_call canonical_install_glog=$(grep -c '^function install_glog {' scripts/setup-common.sh)"; exit 1
+  fi
+  bash -n scripts/setup-ubuntu.sh || { echo "ERROR: setup-ubuntu.sh syntax check failed"; exit 1; }
   echo "Using setup script from Velox"
 }
 
