@@ -66,6 +66,46 @@ fi
 
 function process_setup_ubuntu {
   sed -i "s|run_and_time install_arrow||g" scripts/setup-ubuntu.sh
+  # GLUTEN 12316: Ubuntu's apt libgflags.a is not -fPIC, so linking it into the shared
+  # libvelox.so fails (relocation R_X86_64_PC32 against `stderr`) whenever Folly is static
+  # and exports gflags_static — i.e. the VELOX_BUILD_SHARED=OFF path. apt glog also drags
+  # apt libgflags.so.2.2 into the process at runtime. Build the pinned gflags from source
+  # with PIC and additionally run the canonical install_glog from setup-common.sh so glog is
+  # source-built against the same gflags. Both install into /usr/local (searched before the
+  # apt copies) and run before install_folly. cmake_install_dir forces -fPIC.
+  #
+  # Scope: only run the source builds when VELOX_BUILD_SHARED != ON. With ON, Folly is shared
+  # and uses gflags_shared, so libvelox.so never links the non-PIC static archive and needs
+  # no source gflags/glog. The install_gflags definition is always injected (harmless if the
+  # call is skipped); the calls are gated. The gate variable is set by setup-common.sh
+  # (sourced above by setup-ubuntu.sh), the same var its own install_folly branches on.
+  if ! grep -q "^function install_gflags {" scripts/setup-ubuntu.sh; then
+    sed -i '/function install_velox_deps {/i \
+function install_gflags {\
+  wget_and_untar https://github.com/gflags/gflags/archive/${GFLAGS_VERSION}.tar.gz gflags\
+  cmake_install_dir gflags -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=ON -DBUILD_gflags_LIB=ON\
+}\
+' scripts/setup-ubuntu.sh
+  fi
+  if ! grep -q "^[[:space:]]*run_and_time install_gflags$" scripts/setup-ubuntu.sh; then
+    sed -i '/run_and_time install_velox_deps_from_apt/a \
+  if [ "${VELOX_BUILD_SHARED:-OFF}" != "ON" ]; then\
+    run_and_time install_gflags\
+    run_and_time install_glog\
+  fi' scripts/setup-ubuntu.sh
+  fi
+  local gflags_func gflags_call glog_call gate
+  gflags_func=$(grep -c "^function install_gflags {" scripts/setup-ubuntu.sh || true)
+  gflags_call=$(grep -c "^[[:space:]]*run_and_time install_gflags$" scripts/setup-ubuntu.sh || true)
+  glog_call=$(grep -c "^[[:space:]]*run_and_time install_glog$" scripts/setup-ubuntu.sh || true)
+  gate=$(grep -c 'if \[ "${VELOX_BUILD_SHARED:-OFF}" != "ON" \]; then' scripts/setup-ubuntu.sh || true)
+  # install_glog is provided canonically by setup-common.sh (sourced by setup-ubuntu.sh);
+  # only inject its call, and assert the canonical definition is present to resolve it.
+  if [ "$gflags_func" -ne 1 ] || [ "$gflags_call" -ne 1 ] || [ "$glog_call" -ne 1 ] || [ "$gate" -ne 1 ] \
+     || ! grep -q "^function install_glog {" scripts/setup-common.sh; then
+    echo "ERROR: gflags/glog injection failed: gflags_func=$gflags_func gflags_call=$gflags_call glog_call=$glog_call gate=$gate canonical_install_glog=$(grep -c '^function install_glog {' scripts/setup-common.sh)"; exit 1
+  fi
+  bash -n scripts/setup-ubuntu.sh || { echo "ERROR: setup-ubuntu.sh syntax check failed"; exit 1; }
   echo "Using setup script from Velox"
 }
 
