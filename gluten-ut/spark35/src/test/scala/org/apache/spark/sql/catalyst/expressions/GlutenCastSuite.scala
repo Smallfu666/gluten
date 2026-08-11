@@ -287,5 +287,14 @@ class GlutenCastSuite extends CastWithAnsiOffSuite with GlutenTestsTrait {
     val d = Decimal(c.getTimeInMillis.toDouble / 1000)
     checkEvaluation(cast(d, TimestampType), new Timestamp(c.getTimeInMillis))
   }
+  testGluten("SPARK-36286: invalid string cast to timestamp") {
+    // Spark returns null for "2015-03-18T" (trailing T with no time component).
+    // Velox's timestamp parser is more lenient and treats the trailing T as a
+    // date/time separator, defaulting the time to 00:00:00.
+    // See https://github.com/apache/gluten/issues/11550
+    checkEvaluation(
+      cast(Literal("2015-03-18T"), TimestampType),
+      Timestamp.valueOf("2015-03-18 00:00:00"))
+  }
 
 }
