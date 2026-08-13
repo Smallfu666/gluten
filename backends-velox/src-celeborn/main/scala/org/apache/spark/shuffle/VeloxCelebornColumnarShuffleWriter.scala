@@ -70,7 +70,7 @@ class VeloxCelebornColumnarShuffleWriter[K, V](
     }
     while (records.hasNext) {
       val cb = records.next()._2.asInstanceOf[ColumnarBatch]
-      if (cb.numRows == 0 || cb.numCols == 0) {
+      if (cb.numRows == 0) {
         logInfo(s"Skip ColumnarBatch of ${cb.numRows} rows, ${cb.numCols} cols")
       } else {
         initShuffleWriter(cb)

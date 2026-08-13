@@ -38,6 +38,7 @@ import org.apache.spark.sql.execution.exchange.GlutenEnsureRequirementsSuite
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.python._
 import org.apache.spark.sql.extension.{GlutenCollapseProjectExecTransformerSuite, GlutenSessionExtensionSuite}
+import org.apache.spark.sql.gluten.GlutenEmptySchemaShuffleSuite
 import org.apache.spark.sql.gluten.GlutenFallbackSuite
 import org.apache.spark.sql.hive.execution._
 import org.apache.spark.sql.sources._
@@ -200,6 +201,7 @@ class VeloxTestSettings extends BackendTestSettings {
     .exclude("SPARK-9127 codegen with long seed")
   enableSuite[GlutenRegexpExpressionsSuite]
   enableSuite[GlutenSortShuffleSuite]
+  enableSuite[GlutenEmptySchemaShuffleSuite]
   enableSuite[GlutenSortOrderExpressionsSuite]
   enableSuite[GlutenStringExpressionsSuite]
   enableSuite[GlutenTryEvalSuite]

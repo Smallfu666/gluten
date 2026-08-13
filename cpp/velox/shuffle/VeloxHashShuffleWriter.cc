@@ -278,7 +278,7 @@ arrow::Status VeloxHashShuffleWriter::write(std::shared_ptr<ColumnarBatch> cb, i
     auto veloxColumnBatch = VeloxColumnarBatch::from(veloxPool_.get(), cb);
     VELOX_CHECK_NOT_NULL(veloxColumnBatch);
     const int32_t numColumns = veloxColumnBatch->numColumns();
-    VELOX_CHECK(numColumns >= 2);
+    VELOX_CHECK(numColumns >= 1);
     auto pidBatch = veloxColumnBatch->select(veloxPool_.get(), {0});
     auto pidArr = getFirstColumn(*(pidBatch->getRowVector()));
     {
@@ -1037,7 +1037,10 @@ arrow::Status VeloxHashShuffleWriter::evictBuffers(
     uint32_t numRows,
     std::vector<std::shared_ptr<arrow::Buffer>> buffers,
     bool reuseBuffers) {
-  if (!buffers.empty()) {
+  // Even when buffers is empty (0-column schema), numRows must be propagated
+  // so the reducer-side row count is preserved. Skip only when there are no
+  // rows to evict.
+  if (numRows > 0) {
     auto* types = partitionWriter_->enableTypeAwareCompress() ? &tacBufferTypes_ : nullptr;
     auto payload = std::make_unique<InMemoryPayload>(
         numRows, &isValidityBuffer_, schema_, std::move(buffers), hasComplexType_, types);

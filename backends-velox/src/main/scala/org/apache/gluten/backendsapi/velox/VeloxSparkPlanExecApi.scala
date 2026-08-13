@@ -614,6 +614,13 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi with Logging {
     }
 
     val conf = GlutenConfig.get
+    // Sort/RssSort shuffle writers do not support empty schema (0-column) batches;
+    // VeloxSortShuffleReaderDeserializer::next() drops rows when bytesRead_ == 0,
+    // which is always the case for 0-column rows (CompactRow bytes are all zero-length
+    // prefixes). Fall back to hash shuffle writer for empty schema to preserve row count.
+    if (output.isEmpty) {
+      return HashShuffleWriterType
+    }
     // todo: remove isUseCelebornShuffleManager here
     if (conf.isUseCelebornShuffleManager) {
       if (conf.celebornShuffleWriterType == ReservedKeys.GLUTEN_SORT_SHUFFLE_WRITER) {
